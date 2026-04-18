@@ -10,9 +10,25 @@ export const signupSchema = z.object({
 
 export const signup = async (req, res) => {
   // 1. Validate request body
-  const { error } = signupSchema.validate(req.body);
-  if (error) {
-    return res.status(400).json({ message: error.details[0].message });
+  // const { error } = signupSchema.validate(req.body);
+  const result = signupSchema.safeParse(req.body);
+
+  // try {
+  //   signupSchema.parse();
+  // } catch (error) {}
+  console.log(result.error);
+  console.log(result.error);
+  if (!result.success) {
+    const errors = {};
+
+    result.error.issues.forEach((err) => {
+      console.log(err);
+      const field = err.path[0];
+      errors[field] = err.message;
+    });
+    return res
+      .status(400)
+      .json({ message: "Validation failed", errors: errors });
   }
 
   const { name, email, password } = req.body;

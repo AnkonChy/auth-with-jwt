@@ -1,11 +1,11 @@
 import bcrypt from "bcrypt";
-import Joi from "joi";
+import { z } from "zod";
 import User from "../models/User.js";
 
-const signupSchema = Joi.object({
-  name: Joi.string().min(2).max(100).required(),
-  email: Joi.string().email().required(),
-  password: Joi.string().min(6).required(),
+export const signupSchema = z.object({
+  name: z.string().min(3, "Name must be at least 3 characters"),
+  email: z.string().email("Invalid email format"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
 export const signup = async (req, res) => {

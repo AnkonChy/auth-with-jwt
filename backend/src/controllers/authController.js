@@ -1,6 +1,7 @@
 import bcrypt from "bcrypt";
 import { z } from "zod";
 import User from "../models/User.js";
+import { generateToken } from "../utils/jwt.js";
 
 export const signupSchema = z.object({
   name: z.string().min(3, "Name must be at least 3 characters"),
@@ -8,16 +9,14 @@ export const signupSchema = z.object({
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
+export const loginSchema = z.object({
+  email: z.string().email("Invalid email format"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
+
 export const signup = async (req, res) => {
-  // 1. Validate request body
-  // const { error } = signupSchema.validate(req.body);
   const result = signupSchema.safeParse(req.body);
 
-  // try {
-  //   signupSchema.parse();
-  // } catch (error) {}
-  console.log(result.error);
-  console.log(result.error);
   if (!result.success) {
     const errors = {};
 
@@ -63,5 +62,63 @@ export const signup = async (req, res) => {
   } catch (err) {
     console.error("Signup error:", err);
     return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const login = async (req, res) => {
+  try {
+    const result = loginSchema.safeParse(req.body);
+    console.log(req.body);
+
+    if (!result.success) {
+      const errors = {};
+
+      result.error.issues.forEach((err) => {
+        console.log(err);
+        const field = err.path[0];
+        errors[field] = err.message;
+      });
+      return res.status(400).json({ message: "Login failed", errors: errors });
+    }
+
+    const { email, password } = result.data;
+
+    const user = await User.findOne({ where: { email } });
+
+    if (!user) {
+      return res.status(400).json({
+        message: "Invalid email or password",
+      });
+    }
+
+    console.log(user.toJSON());
+
+    const isMatch = await bcrypt.compare(password, user.password);
+
+    if (!isMatch) {
+      return res.status(400).json({
+        message: "Invalid email or password",
+      });
+    }
+
+    const token = generateToken({
+      id: user.id,
+      email: user.email,
+    });
+
+    return res.status(200).json({
+      message: "Login successfully",
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+      },
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({
+      message: "Something went wrong",
+      error: error.message,
+    });
   }
 };

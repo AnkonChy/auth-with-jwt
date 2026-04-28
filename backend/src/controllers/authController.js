@@ -122,3 +122,10 @@ export const login = async (req, res) => {
     });
   }
 };
+
+export const getProfile = (req, res) => {
+  res.status(200).json({
+    message: "Profile data fetched successfully",
+    user: req.user,
+  });
+};

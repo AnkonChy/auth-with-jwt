@@ -22,6 +22,10 @@ const User = sequelize.define(
       type: DataTypes.TEXT,
       allowNull: false,
     },
+    refresh_token: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
   },
   {
     tableName: "users",

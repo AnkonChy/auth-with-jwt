@@ -1,7 +1,7 @@
 import bcrypt from "bcrypt";
 import { z } from "zod";
 import User from "../models/User.js";
-import { generateToken } from "../utils/jwt.js";
+import { generateToken, generateRefreshToken, verifyRefreshToken } from "../utils/jwt.js";
 
 export const signupSchema = z.object({
   name: z.string().min(3, "Name must be at least 3 characters"),
@@ -101,14 +101,32 @@ export const login = async (req, res) => {
       });
     }
 
-    const token = generateToken({
+    const accessToken = generateToken({
       id: user.id,
       email: user.email,
     });
 
+    const refreshToken = generateRefreshToken({
+      id: user.id,
+      email: user.email,
+    });
+
+    // Hash the refresh token before saving to DB
+    const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
+    user.refresh_token = hashedRefreshToken;
+    await user.save();
+
+    // Set refresh token in HTTP-only cookie
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+
     return res.status(200).json({
       message: "Login successfully",
-      token,
+      accessToken,
       user: {
         id: user.id,
         email: user.email,
@@ -128,4 +146,59 @@ export const getProfile = (req, res) => {
     message: "Profile data fetched successfully",
     user: req.user,
   });
+};
+
+export const refreshToken = async (req, res) => {
+  const token = req.cookies.refreshToken;
+
+  if (!token) {
+    return res.status(401).json({ message: "Refresh token missing" });
+  }
+
+  try {
+    const decoded = verifyRefreshToken(token);
+    if (!decoded) {
+      return res.status(401).json({ message: "Invalid refresh token" });
+    }
+
+    const user = await User.findByPk(decoded.id);
+    if (!user || !user.refresh_token) {
+      return res.status(401).json({ message: "User not found or token revoked" });
+    }
+
+    // Compare the token from cookie with the hashed token in DB
+    const isMatch = await bcrypt.compare(token, user.refresh_token);
+    if (!isMatch) {
+      return res.status(401).json({ message: "Invalid refresh token" });
+    }
+
+    const newAccessToken = generateToken({ id: user.id, email: user.email });
+
+    return res.status(200).json({ accessToken: newAccessToken });
+  } catch (error) {
+    return res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+export const logout = async (req, res) => {
+  const token = req.cookies.refreshToken;
+
+  if (token) {
+    try {
+      const decoded = verifyRefreshToken(token);
+      if (decoded) {
+        const user = await User.findByPk(decoded.id);
+        if (user) {
+          user.refresh_token = null;
+          await user.save();
+        }
+      }
+    } catch (error) {
+      // If token is invalid or expired, just proceed to clear cookie
+      console.log("Logout token verification failed:", error.message);
+    }
+  }
+
+  res.clearCookie("refreshToken");
+  return res.status(200).json({ message: "Logged out successfully" });
 };

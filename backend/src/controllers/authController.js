@@ -36,7 +36,8 @@ export const signup = async (req, res) => {
       .json({ message: "Validation failed", errors: errors });
   }
 
-  const { name, email, password } = req.body;
+  const { name, password } = req.body;
+  const email = req.body.email.toLowerCase();
 
   try {
     // 2. Check if email already exists
@@ -87,7 +88,8 @@ export const login = async (req, res) => {
       return res.status(400).json({ message: "Login failed", errors: errors });
     }
 
-    const { email, password } = result.data;
+    const { password } = result.data;
+    const email = result.data.email.toLowerCase();
 
     const user = await User.findOne({ where: { email } });
 

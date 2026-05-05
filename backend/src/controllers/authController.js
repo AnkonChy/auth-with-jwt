@@ -4,7 +4,8 @@ import User from "../models/User.js";
 import { generateToken, generateRefreshToken, verifyRefreshToken } from "../utils/jwt.js";
 
 export const signupSchema = z.object({
-  name: z.string().min(3, "Name must be at least 3 characters"),
+  firstName: z.string().min(2, "First name must be at least 2 characters"),
+  lastName: z.string().min(2, "Last name must be at least 2 characters"),
   email: z.string().email("Invalid email format"),
   password: z
     .string()
@@ -36,7 +37,7 @@ export const signup = async (req, res) => {
       .json({ message: "Validation failed", errors: errors });
   }
 
-  const { name, password } = req.body;
+  const { firstName, lastName, password } = req.body;
   const email = req.body.email.toLowerCase();
 
   try {
@@ -51,7 +52,8 @@ export const signup = async (req, res) => {
 
     // 4. Insert new user into DB
     const newUser = await User.create({
-      name,
+      firstName,
+      lastName,
       email,
       password: hashedPassword,
     });
@@ -61,7 +63,8 @@ export const signup = async (req, res) => {
       message: "User registered successfully",
       user: {
         id: newUser.id,
-        name: newUser.name,
+        firstName: newUser.firstName,
+        lastName: newUser.lastName,
         email: newUser.email,
         created_at: newUser.created_at,
       },
@@ -138,6 +141,8 @@ export const login = async (req, res) => {
       user: {
         id: user.id,
         email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
       },
     });
   } catch (error) {
